@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Tic Tac Toe — Responsive</title>
+  <style>
+    :root{
+      --bg:#0f1724; /* deep navy */
+      --card:#0b1220;
+      --accent:#06b6d4; /* teal */
+      --accent-2:#f97316; /* orange */
+      --muted:#94a3b8;
+      --glass: rgba(255,255,255,0.03);
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%;margin:0;font-family:Inter, Roboto, system-ui, -apple-system, "Segoe UI", "Helvetica Neue", Arial;color:#e6eef6;background:linear-gradient(180deg,var(--bg),#071124);}
+
+    .app{
+      min-height:100vh;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:24px;
+    }
+
+    .card{
+      width:100%;
+      max-width:520px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+      border-radius:16px;
+      padding:18px;
+      box-shadow: 0 6px 30px rgba(2,6,23,0.6);
+      border:1px solid rgba(255,255,255,0.03);
+    }
+
+    header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}
+    h1{font-size:18px;margin:0}
+    .controls{display:flex;gap:8px;align-items:center}
+
+    .toggle, .btn{background:var(--glass);border-radius:10px;padding:8px 10px;border:1px solid rgba(255,255,255,0.03);cursor:pointer;color:var(--muted);font-weight:600}
+    .btn.primary{background:linear-gradient(90deg,var(--accent),var(--accent-2));color:#041025; border:none}
+
+    .score-row{display:flex;gap:8px;align-items:center;margin-bottom:12px}
+    .score{flex:1;background:rgba(255,255,255,0.02);padding:10px;border-radius:10px;text-align:center}
+    .score b{display:block;font-size:20px}
+    .small{font-size:12px;color:var(--muted)}
+
+    /* Board */
+    .board-wrap{display:flex;flex-direction:column;gap:12px;align-items:center}
+    .board{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;width:100%;max-width:420px}
+    .cell{
+      aspect-ratio:1/1;
+      border-radius:12px;
+      display:flex;align-items:center;justify-content:center;font-size:44px;font-weight:700;user-select:none;
+      background:linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.005));
+      border:1px solid rgba(255,255,255,0.02);
+      transition:transform .12s ease, box-shadow .12s ease;
+      color:#dbeafe;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .cell:active{transform:scale(.98)}
+    .cell.disabled{cursor:not-allowed;opacity:.7}
+
+    .status{width:100%;text-align:center;margin-top:6px;font-weight:600}
+
+    .footer{display:flex;gap:8px;align-items:center;justify-content:space-between;margin-top:12px}
+
+    /* responsive text sizes */
+    @media (max-width:480px){
+      .cell{font-size:36px;border-radius:10px}
+      h1{font-size:16px}
+      .card{padding:14px}
+    }
+
+    /* highlight winning line */
+    .win{background:linear-gradient(90deg, rgba(6,182,212,0.18), rgba(249,115,22,0.12));box-shadow:0 8px 30px rgba(6,182,212,0.06);}
+
+    /* subtle animations */
+    .pulse{animation:pulse 1s ease-in-out}
+    @keyframes pulse{0%{transform:scale(1)}50%{transform:scale(1.02)}100%{transform:scale(1)}}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="card" role="application" aria-label="Tic Tac Toe game">
+      <header>
+        <h1>Tic Tac Toe</h1>
+        <div class="controls">
+          <div id="modeToggle" class="toggle" title="Change play mode">Mode: <span id="modeLabel">2 Player</span></div>
+          <button id="resetBtn" class="btn">Reset</button>
+        </div>
+      </header>
+
+      <div class="score-row">
+        <div class="score">
+          <span class="small">Player X</span>
+          <b id="scoreX">0</b>
+        </div>
+        <div class="score">
+          <span class="small">Ties</span>
+          <b id="scoreT">0</b>
+        </div>
+        <div class="score">
+          <span class="small">Player O</span>
+          <b id="scoreO">0</b>
+        </div>
+      </div>
+
+      <div class="board-wrap">
+        <div id="board" class="board" aria-label="tic tac toe board">
+          <!-- cells inserted by JS -->
+        </div>
+        <div class="status" id="status">Turn: <strong id="turnLabel">X</strong></div>
+      </div>
+
+      <div class="footer">
+        <div class="small">Tap a square to play. Works on mobile & desktop.</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button id="undoBtn" class="btn">Undo</button>
+          <button id="newGameBtn" class="btn primary">New Game</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    // Basic Tic-Tac-Toe implementation (responsive + mobile/touch)
+    (function(){
+      const boardEl = document.getElementById('board');
+      const statusEl = document.getElementById('status');
+      const turnLabel = document.getElementById('turnLabel');
+      const scoreX = document.getElementById('scoreX');
+      const scoreO = document.getElementById('scoreO');
+      const scoreT = document.getElementById('scoreT');
+      const resetBtn = document.getElementById('resetBtn');
+      const newGameBtn = document.getElementById('newGameBtn');
+      const undoBtn = document.getElementById('undoBtn');
+      const modeToggle = document.getElementById('modeToggle');
+      const modeLabel = document.getElementById('modeLabel');
+
+      let cells = []; // dom elements
+      let board = Array(9).fill(null); // 'X' | 'O' | null
+      let current = 'X';
+      let history = [];
+      let scores = {X:0,O:0,T:0};
+      let gameOver = false;
+      let mode = '2P'; // '2P' or 'CPU'
+
+      const wins = [
+        [0,1,2],[3,4,5],[6,7,8],
+        [0,3,6],[1,4,7],[2,5,8],
+        [0,4,8],[2,4,6]
+      ];
+
+      function createBoard(){
+        boardEl.innerHTML = '';
+        cells = [];
+        for(let i=0;i<9;i++){
+          const c = document.createElement('button');
+          c.className='cell';
+          c.setAttribute('data-i',i);
+          c.setAttribute('aria-label','cell '+(i+1));
+          c.addEventListener('click', onCellClick);
+          boardEl.appendChild(c);
+          cells.push(c);
+        }
+        updateUI();
+      }
+
+      function onCellClick(e){
+        const i = Number(e.currentTarget.dataset.i);
+        if(gameOver) return;
+        if(board[i]) return; // already filled
+
+        makeMove(i, current);
+
+        if(mode==='CPU' && !gameOver){
+          // simple CPU: small delay for better UX
+          setTimeout(()=>{
+            cpuMove();
+          }, 300);
+        }
+      }
+
+      function makeMove(i, player){
+        board[i] = player;
+        history.push({i,player});
+        renderCell(i);
+        const res = checkWinner();
+        if(res){
+          finishGame(res);
+        } else {
+          togglePlayer();
+        }
+        updateUI();
+      }
+
+      function renderCell(i){
+        const el = cells[i];
+        el.textContent = board[i] || '';
+        el.classList.toggle('disabled', !!board[i]);
+      }
+
+      function togglePlayer(){
+        current = current === 'X' ? 'O' : 'X';
+      }
+
+      function checkWinner(){
+        for(const line of wins){
+          const [a,b,c] = line;
+          if(board[a] && board[a] === board[b] && board[a] === board[c]){
+            return {winner: board[a], line};
+          }
+        }
+        if(board.every(Boolean)) return {winner:null};
+        return null;
+      }
+
+      function finishGame(res){
+        gameOver = true;
+        if(res.winner){
+          // highlight winning cells
+          res.line.forEach(i=>cells[i].classList.add('win','pulse'));
+          scores[res.winner]++;
+          statusEl.innerHTML = 'Winner: <strong>'+res.winner+'</strong>';
+        } else {
+          scores.T++;
+          statusEl.textContent = 'Tie!';
+        }
+        persistScores();
+        updateUI();
+      }
+
+      function updateUI(){
+        turnLabel.textContent = current;
+        scoreX.textContent = scores.X;
+        scoreO.textContent = scores.O;
+        scoreT.textContent = scores.T;
+        // Disable interaction when over
+        cells.forEach((c,i)=>{
+          c.disabled = !!board[i] || gameOver;
+        });
+      }
+
+      function resetBoard(){
+        board = Array(9).fill(null);
+        history = [];
+        current = 'X';
+        gameOver = false;
+        createBoard();
+        statusEl.textContent = 'Turn: ';
+        turnLabel.textContent = current;
+      }
+
+      function newGame(){
+        resetBoard();
+        scores = {X:0,O:0,T:0};
+        persistScores();
+        updateUI();
+      }
+
+      function undo(){
+        if(history.length===0 || gameOver) return;
+        const last = history.pop();
+        board[last.i] = null;
+        current = last.player; // current becomes the player who made the undone move
+        gameOver = false;
+        // clear win highlights
+        cells.forEach(c=>c.classList.remove('win','pulse'));
+        createBoard();
+      }
+
+      function cpuMove(){
+        // Basic 'easy' CPU: choose random available cell
+        const empties = board.map((v,i)=>v?null:i).filter(v=>v!==null);
+        if(empties.length===0) return;
+        const choice = empties[Math.floor(Math.random()*empties.length)];
+        makeMove(choice, current);
+      }
+
+      function persistScores(){
+        try{
+          localStorage.setItem('ttt_scores', JSON.stringify(scores));
+        }catch(e){/* ignore */}
+      }
+
+      function loadScores(){
+        try{
+          const s = localStorage.getItem('ttt_scores');
+          if(s) scores = JSON.parse(s);
+        }catch(e){}
+      }
+
+      // UI controls
+      resetBtn.addEventListener('click', ()=>{
+        resetBoard();
+      });
+
+      newGameBtn.addEventListener('click', ()=>{
+        if(confirm('Start a new game and reset scores?')) newGame();
+      });
+
+      undoBtn.addEventListener('click', ()=>{
+        undo();
+      });
+
+      modeToggle.addEventListener('click', ()=>{
+        if(mode==='2P'){
+          mode='CPU';
+          modeLabel.textContent='Single Player';
+          // if CPU starts as O it's fine. Keep current player X
+        } else {
+          mode='2P';
+          modeLabel.textContent='2 Player';
+        }
+      });
+
+      // initialize
+      loadScores();
+      createBoard();
+
+      // keyboard accessibility
+      document.addEventListener('keydown', (e)=>{
+        if(e.key === 'r') resetBoard();
+        if(e.key === 'n') newGame();
+        if(e.key === 'u') undo();
+      });
+
+      // simple touch hint for mobile: focus first cell on load
+      setTimeout(()=>{ if(cells[0]) cells[0].setAttribute('tabindex','0'); },200);
+
+      // expose for debugging (optional)
+      window.__ttt = {board,resetBoard,newGame,undo};
+
+    })();
+  </script>
+</body>
+</html>
